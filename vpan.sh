@@ -1,12 +1,16 @@
 #!/bin/bash
 
 #source variables file - should include 
-# username = application-id or username
-# password = app or user password
-# tenant = application tenant id
-# account = optional account/subscription id
+# username=application-id or username
+# password=app or user password
+# tenant=application tenant id
+# account=optional account/subscription id
+# vpan_admin=name of username for firewall
+# vpan_password=password for vpan_admin
 LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
+PAN_VERSION="latest"
+PAN_SKU="byol"
 
 if ! [ -x "$(command -v dialog)" ]; then
 	echo 'Error: dialog not installed.  Please install.' >&2
@@ -27,7 +31,35 @@ source $LOGIN_VARIABLES
 
 
 region=$($DIALOG --radiolist "Regions" 20 60 12 "CAE" "Canada East" "off" "EUN" "Europe North" "on"  2>&1 > /dev/tty)
+region_lower=$(echo "$region" | tr '[:upper:]' '[:lower:]')
+
 tenantID=$($DIALOG --inputbox "Tenant ID:" 20 60 "9999" 2>&1 > /dev/tty)
+
+case "$region" in
+	EUN)
+		location="northeurope"
+		;;
+	CAE)
+		location="canadaeast"
+		;;
+		*) 
+		echo "Invalid Input"
+		exit 1
+		;;
+esac
+VFW_RG="$region-TEN$tenantID-VFW-RG"
+VFW_STORAGE="${region_lower}ten${tenantID}vfw"
+VFW_MGMT_PUBLIC_IP_DNS="${region_lower}ten${tenantID}vfw"
+VFW_UNTRUST_PUBLIC_IP_DNS="${region_lower}ten${tenantID}vfw-pub"
+VFW_NAME="${region_lower}ten${tenantID}vfw"
+VFW_MGMT_NAME="$region-TEN$tenantID-Sub8-MGMT"
+VFW_UNTRUST_NAME="$region-TEN$tenantID-Sub8-Untrust"
+VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
+
+VFW_UNTRUST_NIC="$VFW_NAME-eth1"
+VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
+
+VFW_SIZE="Standard_D3_v2"
 # Make sure logged out already
 az logout
 # Login
@@ -62,7 +94,58 @@ vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1)
 unset IFS
 #Get Subnet1 info to determine /21 starting range
 vnet_sub1_range=$(az network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
+vnet_sub8_range=$(az network vnet subnet show -n $vnet_name_sub8 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
+vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
 vnet_tenant_supernet="$vnet_sub1_range/21"
+vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
+vnet_prefix=$($vnet_prefix | sed -e 's/^"//' -e 's/"$//')
+# Delete old subnet - check if exists first
+az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
+# Create new subnets - check if exists first
+mgmt_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
+untrust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
+trust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_TRUST_NAME --address-prefix "$VFW_TRUST_PREFIX")
+#Define Subnet ip information based off values obtained above
+VFW_MGMT_START="$vnet_sub8_net.4"
+VFW_UNTRUST_START="$vnet_sub8_net.20"
+VFW_TRUST_START="$vnet_sub8_net.36"
+VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
+VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
+VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
+# Create Resource group
+az group create --location $location -n $VFW_RG
+# Create Storage account
+$storage_create=$(az storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku Standard_LRS)
+#Deploy VM using local AzureDeploy.json file.  Could also use a URI including new Azure template storage which is currently in Preview
+az group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
+	"vmName": {"value": "'$VFW_NAME'"},
+	"storageAccountName": {"value": "'$VFW_STORAGE'"},
+	"storageAccountExistingRG": {"value": "'$VFW_RG'"},
+	"vmSize": {"value": "'$VFW_SIZE'"},
+	"imageVersion": {"value": "'$PAN_VERSION'"},
+	"imageSku": {"value": "'$PAN_SKU'"},
+	"virtualNetworkName": {"value": "'$vnet_name'"},
+	"virtualNetworkAddressPrefix": {"value": "'$vnet_prefix'"},
+	"virtualNetworkExistingRGName": {"value": "'$vnet_rg'"},
+	"subnet0Name": {"value": "'$VFW_MGMT_NAME'"},
+	"subnet1Name": {"value": "'$VFW_UNTRUST_NAME'"},
+	"subnet2Name": {"value": "'$VFW_TRUST_NAME'"},
+	"subnet0Prefix": {"value": "'$VFW_MGMT_PREFIX'"},
+	"subnet1Prefix": {"value": "'$VFW_UNTRUST_PREFIX'"},
+	"subnet2Prefix": {"value": "'$VFW_TRUST_PREFIX'"},
+	"subnet0StartAddress": {"value": "'$VFW_MGMT_START'"},
+	"subnet1StartAddress": {"value": "'$VFW_UNTRUST_START'"},
+	"subnet2StartAddress": {"value": "'$VFW_TRUST_START'"},
+	"adminUsername": {"value": "'$vpan_admin'"},
+	"adminPassword": {"value": "'$vpan_password'"},
+	"publicIPAddressName": {"value": "'$VFW_MGMT_PUBLIC_IP_DNS'"}
+	}'
+
+# Post Deploy
+# Create Untrust Public IP object and associate with untrust network interface
+az network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
+az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
+
 
 #echo $vnet_tenant_supernet
 # Get Hosting Plus subscription list
