@@ -11,7 +11,7 @@ LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
 PAN_VERSION="latest"
 PAN_SKU="byol"
-
+STORAGE_SKU="Standard_LRS"
 if ! [ -x "$(command -v dialog)" ]; then
 	echo 'Error: dialog not installed.  Please install.' >&2
 	exit 1
@@ -22,8 +22,8 @@ if ! [ -f $LOGIN_VARIABLES ]; then
 	exit 1
 fi
 
-if ! grep -q -e username -e password -e tenant $LOGIN_VARIABLES; then
-	echo "Login variable file is missing either username, password, or tenant variable"
+if ! grep -q -e username -e password -e tenant -e vpan_admin -e vpan_password $LOGIN_VARIABLES; then
+	echo "Login variable file is missing either username, password, tenant, or a vpan credentials variable"
 	exit 1
 fi
 
@@ -115,7 +115,7 @@ VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
 # Create Resource group
 az group create --location $location -n $VFW_RG
 # Create Storage account
-$storage_create=$(az storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku Standard_LRS)
+$storage_create=$(az storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku $STORAGE_SKU)
 #Deploy VM using local AzureDeploy.json file.  Could also use a URI including new Azure template storage which is currently in Preview
 az group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
 	"vmName": {"value": "'$VFW_NAME'"},
@@ -140,13 +140,18 @@ az group deployment create -g $VFW_RG --template-file AzureDeploy.json --paramet
 	"adminPassword": {"value": "'$vpan_password'"},
 	"publicIPAddressName": {"value": "'$VFW_MGMT_PUBLIC_IP_DNS'"}
 	}'
-
+# Some logic to quit program if VM not created
+# if az resource vm not exist then exit or store above command in variable
+# will depend on if adding the $() will cause json formatting issues
 # Post Deploy
 # Create Untrust Public IP object and associate with untrust network interface
 az network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
 az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
+# Tag VM  - need to figure out what to use for values
+az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
-
+#Set up ansible host vars
+# echo variables into hosts/$VFW_NAME.FQDN
 #echo $vnet_tenant_supernet
 # Get Hosting Plus subscription list
 #subscription_string=`az account list  | grep $region-HOSTINGPLUS | cut -f2 -d: | cut -f 1 -d, | sort`
