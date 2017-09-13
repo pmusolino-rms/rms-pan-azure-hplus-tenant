@@ -84,7 +84,7 @@ if [ -n "${account}" ]; then
 	az account set --subscription $account
 fi
 #Get vnet variables for tenant ID provided and place into an array.  
-vnet_string=$(az network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub8 -e Sub1)
+vnet_string=$(az network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1-8])
 if [ -z "${vnet_string}" ]; then 
 	echo "Could not find a network in $region with tenant id $tenantID.  Exiting..."
 	exit 1
@@ -103,6 +103,7 @@ vnet_name_sub1=$(echo ${vnet_vars[10]} | cut -d\" -f1)
 read -a vnet_vars <<< "${vnet_array[1]}"
 vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1)
 unset IFS
+vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "$vnet_name_sub1")
 #Get Subnet1 info to determine /21 starting range
 vnet_sub1_range=$(az network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_sub8_range=$(az network vnet subnet show -n $vnet_name_sub8 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
@@ -112,6 +113,10 @@ vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpa
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
 # Delete old subnet - check if exists first
 az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
+# Prefixes
+VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
+VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
+VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
 # Create new subnets - check if exists first
 mgmt_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
 untrust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
@@ -120,9 +125,6 @@ trust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name 
 VFW_MGMT_START="$vnet_sub8_net.4"
 VFW_UNTRUST_START="$vnet_sub8_net.20"
 VFW_TRUST_START="$vnet_sub8_net.36"
-VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
-VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
-VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
 VFW_UNTRUST_NEXTHOP="$vnet_sub8_net.17"
 VFW_TRUST_NEXTHOP="$vnet_sub8_net.33"
 # Create Resource group
@@ -188,10 +190,13 @@ $ANSIBLE_PLAYBOOK basic_network_config.yml
 
 # Post Config azure routing/acls
 #UDRs
-VFW_RT_NAME="TEN-$tenantID-UDR"
+VFW_RT_NAME="$region-TEN$tenantID-RT1"
 az network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
-az network route-table route --address-prefix
 az network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
+for i in `seq 1 7`
+    do
+	az network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_name --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
+	done
 
 #echo $vnet_tenant_supernet
 # Get Hosting Plus subscription list
