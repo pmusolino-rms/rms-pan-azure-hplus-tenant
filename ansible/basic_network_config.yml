@@ -12,7 +12,7 @@
         - role: pan-basic-config
           untrust_ip: "{{ vfw_untrust_ip }}"
           trust_ip: "{{ vfw_trust_ip }}"
-          vr_name: "{{ upper_location }}-Ten{{ vfw_tenant_id }}-VR"
+          vr_name: "{{ region }}-Ten{{ vfw_tenant_id }}-VR"
           vfw_name: "{{ vpan_name }}"
           default_nexthop: "{{ vfw_default_nexthop }}"
           tenant_nexthop: "{{ vfw_tenant_nexthop }}"
