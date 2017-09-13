@@ -9,11 +9,17 @@
 # vpan_password=password for vpan_admin
 LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
+ANSIBLE_PLAYBOOK=`which ansible-playbook`
 PAN_VERSION="latest"
 PAN_SKU="byol"
 STORAGE_SKU="Standard_LRS"
 if ! [ -x "$(command -v dialog)" ]; then
 	echo 'Error: dialog not installed.  Please install.' >&2
+	exit 1
+fi
+
+if ! [ -x "$(command -v ansible-playbook)" ]; then
+	echo 'Error: ansible not installed.  Please install.' >&2
 	exit 1
 fi
 
@@ -55,7 +61,7 @@ VFW_NAME="${region_lower}ten${tenantID}vfw"
 VFW_MGMT_NAME="$region-TEN$tenantID-Sub8-MGMT"
 VFW_UNTRUST_NAME="$region-TEN$tenantID-Sub8-Untrust"
 VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
-
+VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
 
@@ -112,6 +118,8 @@ VFW_TRUST_START="$vnet_sub8_net.36"
 VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
 VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
 VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
+VFW_UNTRUST_NEXTHOP="$vnet_sub8_net.17"
+VFW_TRUST_NEXTHOP="$vnet_sub8_net.33"
 # Create Resource group
 az group create --location $location -n $VFW_RG
 # Create Storage account
@@ -147,11 +155,30 @@ az group deployment create -g $VFW_RG --template-file AzureDeploy.json --paramet
 # Create Untrust Public IP object and associate with untrust network interface
 az network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
 az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
-# Tag VM  - need to figure out what to use for values
-az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
+# Tag VM  - need to figure out what to use for values - from salesforce?
+#az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
 #Set up ansible host vars
 # echo variables into hosts/$VFW_NAME.FQDN
+VFW_HOST_VARS="./ansible/host_vars/$VFW_FQDN"
+touch $VFW_HOST_VARS
+echo "---" > $VFW_HOST_VARS
+echo "vpan_name: $VFW_NAME" >> $VFW_HOST_VARS
+echo "vpan_fqdn: $VFW_FQDN" >> $VFW_HOST_VARS
+echo "region: $region">> $VFW_HOST_VARS
+echo "vfw_tenant_id: $tenantID" >> $VFW_HOST_VARS
+echo "vfw_tenant_supernet: $vnet_tenant_supernet" >> $VFW_HOST_VARS
+echo "vfw_tenant_nexthop: $VFW_TRUST_NEXTHOP" >> $VFW_HOST_VARS
+echo "vfw_default_nexthop: $VFW_UNTRUST_NEXTHOP" >> $VFW_HOST_VARS
+echo "vfw_untrust_ip: $VFW_UNTRUST_START" >> $VFW_HOST_VARS
+echo "vfw_trust_ip: $VFW_TRUST_START" >> $VFW_HOST_VARS
+
+VFW_INVENTORY="./ansible/hosts/inventory"
+touch $VFW_INVENTORY
+echo "$VFW_FQDN" > $VFW_INVENTORY
+cd ansible
+$ANSIBLE_PLAYBOOK basic_network_config.yml
+
 #echo $vnet_tenant_supernet
 # Get Hosting Plus subscription list
 #subscription_string=`az account list  | grep $region-HOSTINGPLUS | cut -f2 -d: | cut -f 1 -d, | sort`
@@ -178,11 +205,11 @@ az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Descripti
 #echo $tenantID
 #echo $subs
 #echo $subscription
-echo $vnet_tenant_supernet
-echo $vnet_name_sub1
-echo $vnet_name_sub8
-echo $vnet_name
-echo $vnet_rg
+#echo $vnet_tenant_supernet
+#echo $vnet_name_sub1
+#echo $vnet_name_sub8
+#echo $vnet_name
+#echo $vnet_rg
 #log out of azure
 az logout
 exit 0

@@ -1,0 +1,9 @@
+set network interface ethernet ethernet1/1 layer3 ip {{untrust_ip}}
+set network interface ethernet ethernet1/2 layer3 ip {{trust_ip}}
+set network interface tunnel units tunnel.1
+set network virtual-router {{vr_name}} interface [ ethernet1/1 ethernet1/2 tunnel.1 ]
+set network virtual-router {{vr_name}} routing-table ip static-route default interface ethernet1/1 destination 0.0.0.0/0 nexthop ip-address {{default_nexthop}}
+set network virtual-router {{vr_name}} routing-table ip static-route to_tenant interface ethernet1/2 destination {{tenant_supernet}} nexthop ip-address {{tenant_nexthop}}
+set zone Untrust network layer3 ethernet1/1
+set zone Trust network layer3 ethernet1/2
+set zone VPN network layer3 tunnel.1

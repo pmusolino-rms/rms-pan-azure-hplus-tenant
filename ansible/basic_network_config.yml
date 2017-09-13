@@ -1,0 +1,130 @@
+---
+-   hosts: "{{ vfw_fqdn }}"
+    connection: local
+    vars:
+        provider:
+            hostname: "{{ vfw_fqdn }}"
+            username: "{{ vpan_admin }}"
+            password: "{{ vpan_password }}"
+            dev_os: "panos" 
+        
+    roles:
+        - role: pan-basic-config
+          untrust_ip: "{{ vfw_untrust_ip }}"
+          trust_ip: "{{ vfw_trust_ip }}"
+          vr_name: "{{ upper_location }}-Ten{{ vfw_tenant_id }}-VR"
+          vfw_name: "{{ vpan_name }}"
+          default_nexthop: "{{ vfw_default_nexthop }}"
+          tenant_nexthop: "{{ vfw_tenant_nexthop }}"
+          tenant_supernet: "{{ vfw_tenant_supernet }}"
+        - role: PaloAltoNetworks.paloaltonetworks
+
+    tasks:
+        - name: Install config from template
+          napalm_install_config:
+            provider: "{{ provider }}"
+            config_file: /tmp/{{ vpan_name }}.txt
+            get_diffs: False
+            commit_changes: True
+
+        - name: Create Trust rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'Trust to Trust'
+              description: 'Allow intra Trust zone'
+              source_zone: ['Trust']
+              destination_zone: ['Trust']
+              application: ['any']
+              service: ['any']
+              action: 'allow'
+              commit: False
+          ignore_errors: true
+            
+        - name: Create Untrust rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'Untrust to Untrust'
+              description: 'Allow intra Untrust zone'
+              source_zone: ['Untrust']
+              destination_zone: ['Untrust']
+              application: ['any']
+              service: ['any']
+              action: 'allow'
+              commit: False
+          ignore_errors: true
+
+        - name: Create Outbound rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'Trust to Untrust'
+              description: 'Allow Outbound from Trust'
+              source_zone: ['Trust']
+              destination_zone: ['Untrust']
+              application: ['any']
+              service: ['any']
+              action: 'allow'
+              commit: False
+          ignore_errors: true
+
+        - name: Create VPN Inbound rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'VPN to Trust'
+              description: 'Allow VPN to Trust zone'
+              source_zone: ['VPN']
+              destination_zone: ['Trust']
+              application: ['any']
+              service: ['any']
+              action: 'allow'
+              commit: False
+          ignore_errors: true
+
+        - name: Create Outbound rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'Trust to VPN'
+              description: 'Allow Trust to VPN'
+              source_zone: ['Trust']
+              destination_zone: ['VPN']
+              application: ['any']
+              service: ['any']
+              action: 'allow'
+              commit: False
+          ignore_errors: true
+
+        - name: Create Default Deny rule
+          panos_security_rule:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'
+              operation: 'add'
+              rule_name: 'Default Deny'
+              description: 'Deny anything not explicitly allowed'
+              source_zone: ['any']
+              destination_zone: ['any']
+              application: ['any']
+              service: ['any']
+              action: 'deny'
+              commit: False
+          ignore_errors: true
+
+        - name: commit candidate config on firewall
+          panos_commit:
+              ip_address: '{{ vfw_fqdn }}'
+              username: '{{ vpan_admin }}'
+              password: '{{ vpan_password }}'

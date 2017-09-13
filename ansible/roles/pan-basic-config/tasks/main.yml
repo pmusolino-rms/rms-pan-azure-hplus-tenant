@@ -1,0 +1,4 @@
+---
+# tasks file for pan_basic_config
+- name: Generate basic Config files
+  template: src=pan.j2 dest=/tmp/{{vfw_name}}.txt

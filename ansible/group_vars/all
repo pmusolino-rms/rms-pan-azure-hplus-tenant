@@ -1,0 +1,4 @@
+---
+vpan_admin: user
+vpan_password: "somepassword"
+api_key: "SOMEAPIKEYTHATISREALLYLONGBUTOPTIONAL="
