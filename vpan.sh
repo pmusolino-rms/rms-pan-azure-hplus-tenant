@@ -44,9 +44,14 @@ tenantID=$($DIALOG --inputbox "Tenant ID:" 20 60 "9999" 2>&1 > /dev/tty)
 case "$region" in
 	EUN)
 		location="northeurope"
+		shared_services="10.112.0.0/16"
+		shared_services_fw="10.112.0.69"
 		;;
 	CAE)
 		location="canadaeast"
+		shared_services="10.114.0.0/16"
+        shared_services_fw="10.114.0.69"
+
 		;;
 		*) 
 		echo "Invalid Input"
@@ -104,7 +109,7 @@ vnet_sub8_range=$(az network vnet subnet show -n $vnet_name_sub8 --resource-grou
 vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
 vnet_tenant_supernet="$vnet_sub1_range/21"
 vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
-vnet_prefix=$($vnet_prefix | sed -e 's/^"//' -e 's/"$//')
+vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
 # Delete old subnet - check if exists first
 az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
 # Create new subnets - check if exists first
@@ -159,7 +164,7 @@ az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_U
 #az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
 #Set up ansible host vars
-# echo variables into hosts/$VFW_NAME.FQDN
+# create and echo variables into host_vars/$VFW_NAME.FQDN
 VFW_HOST_VARS="./ansible/host_vars/$VFW_FQDN"
 touch $VFW_HOST_VARS
 echo "---" > $VFW_HOST_VARS
@@ -173,11 +178,20 @@ echo "vfw_default_nexthop: $VFW_UNTRUST_NEXTHOP" >> $VFW_HOST_VARS
 echo "vfw_untrust_ip: $VFW_UNTRUST_START" >> $VFW_HOST_VARS
 echo "vfw_trust_ip: $VFW_TRUST_START" >> $VFW_HOST_VARS
 
+# Create inventory if not there and overwrite with current firewall
 VFW_INVENTORY="./ansible/hosts/inventory"
 touch $VFW_INVENTORY
 echo "$VFW_FQDN" > $VFW_INVENTORY
 cd ansible
+# Run that playbook
 $ANSIBLE_PLAYBOOK basic_network_config.yml
+
+# Post Config azure routing/acls
+#UDRs
+VFW_RT_NAME="TEN-$tenantID-UDR"
+az network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
+az network route-table route --address-prefix
+az network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
 
 #echo $vnet_tenant_supernet
 # Get Hosting Plus subscription list
