@@ -84,7 +84,7 @@ if [ -n "${account}" ]; then
 	az account set --subscription $account
 fi
 #Get vnet variables for tenant ID provided and place into an array.  
-vnet_string=$(az network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1-8])
+vnet_string=$(az network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1,8])
 if [ -z "${vnet_string}" ]; then 
 	echo "Could not find a network in $region with tenant id $tenantID.  Exiting..."
 	exit 1
@@ -112,12 +112,14 @@ vnet_tenant_supernet="$vnet_sub1_range/21"
 vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
 # Delete old subnet - check if exists first
+echo "Deleting subnet 8"
 az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
 # Prefixes
 VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
 VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
 VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
 # Create new subnets - check if exists first
+echo "Recreating Subnets as /28s"
 mgmt_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
 untrust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
 trust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_TRUST_NAME --address-prefix "$VFW_TRUST_PREFIX")
@@ -128,10 +130,13 @@ VFW_TRUST_START="$vnet_sub8_net.36"
 VFW_UNTRUST_NEXTHOP="$vnet_sub8_net.17"
 VFW_TRUST_NEXTHOP="$vnet_sub8_net.33"
 # Create Resource group
+echo "Creating RG $VFW_RG"
 az group create --location $location -n $VFW_RG
 # Create Storage account
+echo "Creating Storage account $VFW_STORAGE"
 $storage_create=$(az storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku $STORAGE_SKU)
 #Deploy VM using local AzureDeploy.json file.  Could also use a URI including new Azure template storage which is currently in Preview
+echo "Starting deployment..."
 az group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
 	"vmName": {"value": "'$VFW_NAME'"},
 	"storageAccountName": {"value": "'$VFW_STORAGE'"},
@@ -155,11 +160,13 @@ az group deployment create -g $VFW_RG --template-file AzureDeploy.json --paramet
 	"adminPassword": {"value": "'$vpan_password'"},
 	"publicIPAddressName": {"value": "'$VFW_MGMT_PUBLIC_IP_DNS'"}
 	}'
+echo "Deployment complete."
 # Some logic to quit program if VM not created
 # if az resource vm not exist then exit or store above command in variable
 # will depend on if adding the $() will cause json formatting issues
 # Post Deploy
 # Create Untrust Public IP object and associate with untrust network interface
+echo "Create public IPs and associate with Untrust"
 az network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
 az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
 # Tag VM  - need to figure out what to use for values - from salesforce?
@@ -167,6 +174,7 @@ az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_U
 
 #Set up ansible host vars
 # create and echo variables into host_vars/$VFW_NAME.FQDN
+echo "Starting Ansible configuration"
 VFW_HOST_VARS="./ansible/host_vars/$VFW_FQDN"
 touch $VFW_HOST_VARS
 echo "---" > $VFW_HOST_VARS
@@ -190,6 +198,7 @@ $ANSIBLE_PLAYBOOK basic_network_config.yml
 
 # Post Config azure routing/acls
 #UDRs
+echo "Creating UDRs and associating with subnets"
 VFW_RT_NAME="$region-TEN$tenantID-RT1"
 az network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
 az network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
