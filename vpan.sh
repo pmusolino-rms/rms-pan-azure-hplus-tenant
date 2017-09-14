@@ -204,7 +204,7 @@ VFW_HOST_VARS="./ansible/host_vars/$VFW_FQDN"
 touch $VFW_HOST_VARS
 echo "---" > $VFW_HOST_VARS
 echo "vpan_name: $VFW_NAME" >> $VFW_HOST_VARS
-echo "vpan_fqdn: $VFW_FQDN" >> $VFW_HOST_VARS
+echo "vfw_fqdn: $VFW_FQDN" >> $VFW_HOST_VARS
 echo "region: $region">> $VFW_HOST_VARS
 echo "vfw_tenant_id: $tenantID" >> $VFW_HOST_VARS
 echo "vfw_tenant_supernet: $vnet_tenant_supernet" >> $VFW_HOST_VARS
