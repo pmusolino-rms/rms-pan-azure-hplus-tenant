@@ -219,7 +219,7 @@ touch $VFW_INVENTORY
 echo "$VFW_FQDN" > $VFW_INVENTORY
 cd ansible
 # Run that playbook
-$ANSIBLE_PLAYBOOK basic_network_config.yml
+$ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
 
 # Post Config azure routing/acls
 #UDRs
