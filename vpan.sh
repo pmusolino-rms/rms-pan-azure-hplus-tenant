@@ -13,6 +13,7 @@ ANSIBLE_PLAYBOOK=`which ansible-playbook`
 PAN_VERSION="latest"
 PAN_SKU="byol"
 STORAGE_SKU="Standard_LRS"
+AZ=`which az`
 if ! [ -x "$(command -v dialog)" ]; then
 	echo 'Error: dialog not installed.  Please install.' >&2
 	exit 1
@@ -20,6 +21,11 @@ fi
 
 if ! [ -x "$(command -v ansible-playbook)" ]; then
 	echo 'Error: ansible not installed.  Please install.' >&2
+	exit 1
+fi
+
+if ! [ -x "$(command -v az)" ]; then
+	echo 'Error: azure cli 2.0 not installed.  Please install.' >&2
 	exit 1
 fi
 
@@ -74,17 +80,17 @@ VFW_SIZE="Standard_D3_v2"
 # Make sure logged out already
 az logout
 # Login
-login=$(az login -u $username --service-principal --tenant $tenant -p $password)
+login=$($AZ login -u $username --service-principal --tenant $tenant -p $password)
 if [ -z "${login}" ]; then
 	echo "Failed to log in"
 	exit 1
 fi
 # Set optional account.  This will default to your accounts default subscription set otherwise
 if [ -n "${account}" ]; then
-	az account set --subscription $account
+	$AZ account set --subscription $account
 fi
 #Get vnet variables for tenant ID provided and place into an array.  
-vnet_string=$(az network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1,8])
+vnet_string=$($AZ network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1,8])
 if [ -z "${vnet_string}" ]; then 
 	echo "Could not find a network in $region with tenant id $tenantID.  Exiting..."
 	exit 1
@@ -105,11 +111,11 @@ vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1)
 unset IFS
 vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "$vnet_name_sub1")
 #Get Subnet1 info to determine /21 starting range
-vnet_sub1_range=$(az network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
-vnet_sub8_range=$(az network vnet subnet show -n $vnet_name_sub8 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
+vnet_sub1_range=$($AZ network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
+vnet_sub8_range=$($AZ network vnet subnet show -n $vnet_name_sub8 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
 vnet_tenant_supernet="$vnet_sub1_range/21"
-vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
+vnet_prefix=$($AZ network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
 $DIALOG --title "Confirm" --backtitle "Azure VPAN Creation" --yesno "Region: ${region}, Tenant: ${tenantID}, RG: ${vnet_rg},\nVnet: ${vnet_name}, IP Space ${vnet_tenant_supernet}" 7 60
 response=$?
@@ -128,16 +134,16 @@ case $response in
 esac
 # Delete old subnet - check if exists first
 echo "Deleting subnet 8"
-az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
+$AZ network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
 # Prefixes
 VFW_MGMT_PREFIX="$vnet_sub8_net.0/28"
 VFW_UNTRUST_PREFIX="$vnet_sub8_net.16/28"
 VFW_TRUST_PREFIX="$vnet_sub8_net.32/28"
 # Create new subnets - check if exists first
-echo "Recreating Subnets as /28s"
-mgmt_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
-untrust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
-trust_create=$(az network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_TRUST_NAME --address-prefix "$VFW_TRUST_PREFIX")
+echo 'Recreating Subnets as /28s'
+mgmt_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
+untrust_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
+trust_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_TRUST_NAME --address-prefix "$VFW_TRUST_PREFIX")
 #Define Subnet ip information based off values obtained above
 VFW_MGMT_START="$vnet_sub8_net.4"
 VFW_UNTRUST_START="$vnet_sub8_net.20"
@@ -149,10 +155,10 @@ echo "Creating RG $VFW_RG"
 az group create --location $location -n $VFW_RG
 # Create Storage account
 echo "Creating Storage account $VFW_STORAGE"
-$storage_create=$(az storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku $STORAGE_SKU)
+storage_create=$($AZ storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku $STORAGE_SKU)
 #Deploy VM using local AzureDeploy.json file.  Could also use a URI including new Azure template storage which is currently in Preview
 echo "Starting deployment..."
-az group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
+$AZ group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
 	"vmName": {"value": "'$VFW_NAME'"},
 	"storageAccountName": {"value": "'$VFW_STORAGE'"},
 	"storageAccountExistingRG": {"value": "'$VFW_RG'"},
@@ -182,8 +188,8 @@ echo "Deployment complete."
 # Post Deploy
 # Create Untrust Public IP object and associate with untrust network interface
 echo "Create public IPs and associate with Untrust"
-az network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
-az network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
+$AZ network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
+$AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
 # Tag VM  - need to figure out what to use for values - from salesforce?
 #az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
@@ -215,8 +221,8 @@ $ANSIBLE_PLAYBOOK basic_network_config.yml
 #UDRs
 echo "Creating UDRs and associating with subnets"
 VFW_RT_NAME="$region-TEN$tenantID-RT1"
-az network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
-az network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
+$AZ network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
+$AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
 for i in `seq 1 7`
     do
 	az network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
