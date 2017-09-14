@@ -69,8 +69,8 @@ VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
-
 VFW_SIZE="Standard_D3_v2"
+
 # Make sure logged out already
 az logout
 # Login
@@ -111,6 +111,21 @@ vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
 vnet_tenant_supernet="$vnet_sub1_range/21"
 vnet_prefix=$(az network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
+$DIALOG --title "Confirm" --backtitle "Azure VPAN Creation" --yesno "Region: ${region}, Tenant: ${tenantID}, RG: ${vnet_rg},\nVnet: ${vnet_name}, IP Space ${vnet_tenant_supernet}" 7 60
+response=$?
+case $response in
+    0) 
+	    echo "Continuing..."
+		;;
+	1) 
+	    echo "Not continuing"
+		#exit 1
+		;;
+	255)
+	    echo "Escaped out"
+		#exit 1
+		;;
+esac
 # Delete old subnet - check if exists first
 echo "Deleting subnet 8"
 az network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
@@ -204,7 +219,7 @@ az network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
 az network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
 for i in `seq 1 7`
     do
-	az network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_name --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
+	az network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
 	done
 
 #echo $vnet_tenant_supernet
