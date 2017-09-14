@@ -235,37 +235,6 @@ for i in `seq 1 7`
 	$AZ network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
 	done
 
-#echo $vnet_tenant_supernet
-# Get Hosting Plus subscription list
-#subscription_string=`az account list  | grep $region-HOSTINGPLUS | cut -f2 -d: | cut -f 1 -d, | sort`
-
-# get number lines in subscription
-#num_subs=`echo $subscription_string | wc -l`
-# Convert multiline string into array
-#subscription_array=()
-#while read -r line; do
-#	subscription_array+=("$line")
-#done <<< "$subscription_string"
-
-# Build Dialog around list of subscriptions matching region
-#subscription_dialog="$DIALOG --radiolist "Subscriptions" 20 60 12 "
-#for i in $subscription_string
-#do
-#	subscription_dialog+="$i $i on " 
-#done
-#subscription=$($subscription_dialog 2>&1 > /dev/tty)
-
-#Variable outputs for debugging
-#echo $subscription_dialog
-#echo $region
-#echo $tenantID
-#echo $subs
-#echo $subscription
-#echo $vnet_tenant_supernet
-#echo $vnet_name_sub1
-#echo $vnet_name_sub8
-#echo $vnet_name
-#echo $vnet_rg
 #log out of azure
 az logout
 exit 0
