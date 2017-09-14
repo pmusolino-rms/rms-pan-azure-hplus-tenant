@@ -78,6 +78,7 @@ VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
 VFW_SIZE="Standard_D3_v2"
 
 # Make sure logged out already
+echo "Forcing logout of an existing session"
 az logout
 # Login
 login=$($AZ login -u $username --service-principal --tenant $tenant -p $password)
@@ -93,6 +94,7 @@ fi
 vnet_string=$($AZ network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1,8])
 if [ -z "${vnet_string}" ]; then 
 	echo "Could not find a network in $region with tenant id $tenantID.  Exiting..."
+	$AZ logout
 	exit 1
 fi
 vnet_array=()
@@ -125,11 +127,13 @@ case $response in
 		;;
 	1) 
 	    echo "Not continuing"
-		#exit 1
+		$AZ logout
+		exit 1
 		;;
 	255)
 	    echo "Escaped out"
-		#exit 1
+		$AZ logout
+		exit 1
 		;;
 esac
 # Delete old subnet - check if exists first
@@ -225,7 +229,7 @@ $AZ network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
 $AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
 for i in `seq 1 7`
     do
-	az network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
+	$AZ network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
 	done
 
 #echo $vnet_tenant_supernet
