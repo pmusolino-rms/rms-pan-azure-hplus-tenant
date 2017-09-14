@@ -22,10 +22,10 @@
     tasks:
         - name: Install config from template
           napalm_install_config:
-            provider: "{{ provider }}"
-            config_file: /tmp/{{ vpan_name }}.txt
-            get_diffs: False
-            commit_changes: True
+              provider: "{{ provider }}"
+              config_file: /tmp/{{ vpan_name }}.txt
+              get_diffs: False
+              commit_changes: True
 
         - name: Create Trust rule
           panos_security_rule:
