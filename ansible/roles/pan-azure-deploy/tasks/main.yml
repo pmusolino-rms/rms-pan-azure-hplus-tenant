@@ -10,8 +10,8 @@
 - name: Create subnets 
   azure_rm_subnet:
       name: "{{ item.name }}"
-      virtual_network_name: "{{ item.vnet }}"
-      resource_group: "{{ item.rg }}"
+      virtual_network_name: "{{ tenant_vnet }}"
+      resource_group: "{{ tenant_rg }}"
       address_prefix_cidr: "{{ item.prefix }}"
   with_items: "{{ subnets }}"
 
@@ -22,7 +22,7 @@
 
 - name: Create Storage Account
   azure_rm_storageaccount:
-      resoure_group "{{ vfw_rg }}"
+      resoure_group: "{{ vfw_rg }}"
       name: "{{ vfw_sa }}"
       type: "{{ storage_sku }}"
 
@@ -33,4 +33,44 @@
       template_link: "./AzureDeploy.json"
       parameters:
           vmName:
+              value: "{{ vpan_name }}"
+          storageAccountName:
+              value: "{{ vfw_sa }}"
+          storageAccountExistingRG:
+              value:  "{{ vfw_rg }}"
+          vmSize:
+              value: "{{ vfw_size }}"
+          imageVersion:
+              value: "{{ vfw_version }}"
+          imageSku:
+              value: "{{ vfw_sku }}"
+          virtualNetworkName:
+              value: "{{ tenant_vnet }}"
+          virtualNetworkAddressPrefix:
+              value: "{{ tenant_prefix }}"
+          virtualNetworkExistingRGName:
+              value: "{{ tenant_rg }}"
+          subnet0Name:
+              value: "{{ tenant_vfw_mgmt }}"
+          subnet1Name:
+              value: "{{ tenant_vfw_untrust }}"
+          subnet2Name:
+              value: "{{ tenant_vfw_trust }}"
+          subnet0Prefix:
+              value: "{{ tenant_vfw_mgmt_prefix }}"
+          subnet1Prefix:
+              value: "{{ tenant_vfw_untrust_prefix }}"
+          subnet2Prefix:
+              value: "{{ tenant_vfw_trust_prefix }}"
+          subnet0StartAddress:
+              value: "{{ vfw_mgmt_ip }}"
+          subnet1StartAddress:
+              value: "{{ vfw_untrust_ip }}"
+          subnet2StartAddress:
+              value: "{{ vfw_trust_ip }}"
+          adminUsername:
+              value: "{{ vpan_admin }}"
+          adminPassword:
+              value: "{{ vpan_password }}"
+          publicIPAddressName:
               value: "{{ vpan_name }}"
