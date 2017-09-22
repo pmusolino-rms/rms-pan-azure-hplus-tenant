@@ -25,4 +25,3 @@
           default_nexthop: "{{ vfw_default_nexthop }}"
           tenant_nexthop: "{{ vfw_tenant_nexthop }}"
           tenant_supernet: "{{ vfw_tenant_supernet }}"
-    tasks:

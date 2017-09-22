@@ -10,10 +10,9 @@
 LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
 ANSIBLE_PLAYBOOK=`which ansible-playbook`
-PAN_VERSION="latest"
-PAN_SKU="byol"
-STORAGE_SKU="Standard_LRS"
 AZ=`which az`
+
+
 if ! [ -x "$(command -v dialog)" ]; then
 	echo 'Error: dialog not installed.  Please install.' >&2
 	exit 1
@@ -40,7 +39,6 @@ if ! grep -q -e username -e password -e tenant -e vpan_admin -e vpan_password $L
 fi
 
 source $LOGIN_VARIABLES
-
 
 region=$($DIALOG --radiolist "Regions" 20 60 12 "CAE" "Canada East" "off" "EUN" "Europe North" "on"  2>&1 > /dev/tty)
 region_lower=$(echo "$region" | tr '[:upper:]' '[:lower:]')
@@ -75,7 +73,6 @@ VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
-VFW_SIZE="Standard_D3_v2"
 
 # Make sure logged out already
 echo "Forcing logout of an existing session"
@@ -109,14 +106,21 @@ vnet_rg=${vnet_vars[4]}
 vnet_name=${vnet_vars[8]}
 vnet_name_sub1=$(echo ${vnet_vars[10]} | cut -d\" -f1)
 read -a vnet_vars <<< "${vnet_array[1]}"
-vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1)
+vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1 | cut -d'-' -f1-3)
 unset IFS
 vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "$vnet_name_sub1")
 #Get Subnet1 info to determine /21 starting range
 vnet_sub1_range=$($AZ network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
+vnet_tenant_supernet="$vnet_sub1_range/21"
+classb=$(echo $vnet_sub1_range | cut -d. -f1-2)
+thrid_octet=$(echo $vnet_sub1_range | cut -d. -f3)
+sub8_octet=$(( $third_octet + 7 ))
 vnet_sub8_range=$($AZ network vnet subnet show -n $vnet_name_sub8 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
-vnet_tenant_supernet="$vnet_sub1_range/21"
+if [ -z "${vnet_sub8_net}" ]; then
+    vnet_sub8_net=${classb}.${sub8_octet}
+	echo hi
+fi
 vnet_prefix=$($AZ network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
 $DIALOG --title "Confirm" --backtitle "Azure VPAN Creation" --yesno "Region: ${region}, Tenant: ${tenantID}, RG: ${vnet_rg},\nVnet: ${vnet_name}, IP Space ${vnet_tenant_supernet}" 7 60
@@ -151,8 +155,34 @@ VFW_TRUST_NEXTHOP="$vnet_sub8_net.33"
 echo "Starting Ansible configuration"
 LOCALHOST_VARS="./ansible/host_vars/localhost"
 VFW_HOST_VARS="./ansible/host_vars/$VFW_FQDN"
+ALL_VARS="./ansible/group_vars/all"
+touch $ALL_VARS
 touch $LOCALHOST_VARS
 echo "---" > $LOCALHOST_VARS
+echo "tenant_subnet8: $vnet_name_sub8" >> $LOCALHOST_VARS
+echo "tenant_vnet: $vnet_name" >> $LOCALHOST_VARS
+echo "tenant_rg: $vnet_rg" >> $LOCALHOST_VARS
+echo "subnets:" >> $LOCALHOST_VARS
+echo "    - { name: $VFW_MGMT_NAME, prefix: $VFW_MGMT_PREFIX }" >> $LOCALHOST_VARS
+echo "    - { name: $VFW_UNTRUST_NAME, prefix: $VFW_UNTRUST_PREFIX }" >> $LOCALHOST_VARS
+echo "    - { name: $VFW_TRUST_NAME, prefix: $VFW_TRUST_PREFIX }" >> $LOCALHOST_VARS
+echo "location: $location" >> $LOCALHOST_VARS
+echo "vfw_rg: $VFW_RG" >> $LOCALHOST_VARS
+echo "vfw_sa: $VFW_STORAGE" >> $LOCALHOST_VARS
+echo "tenant_prefix: $vnet_prefix" >> $LOCALHOST_VARS
+echo "tenant_vfw_mgmt: $VFW_MGMT_NAME" >> $LOCALHOST_VARS
+echo "tenant_vfw_untrust: $VFW_UNTRUST_NAME" >> $LOCALHOST_VARS
+echo "tenant_vfw_trust: $VFW_TRUST_NAME" >> $LOCALHOST_VARS
+echo "tenant_vfw_mgmt_prefix: $VFW_MGMT_PREFIX" >> $LOCALHOST_VARS
+echo "tenant_vfw_untrust_prefix: $VFW_UNTRUST_PREFIX" >> $LOCALHOST_VARS
+echo "tenant_vfw_trust_prefix: $VFW_TRUST_PREFIX" >> $LOCALHOST_VARS
+echo "vfw_mgmt_ip: $VFW_MGMT_START" >> $LOCALHOST_VARS
+echo "vfw_untrust_ip: $VFW_UNTRUST_START" >> $LOCALHOST_VARS
+echo "vfw_trust_ip: $VFW_TRUST_START" >> $LOCALHOST_VARS
+echo "vpan_name: $VFW_NAME" >> $LOCALHOST_VARS
+echo "vfw_untrust_ip_dns: $VFW_UNTRUST_PUBLIC_IP_DNS"  >> $LOCALHOST_VARS
+echo "vfw_untrust_ipconfig: $VFW_UNTRUST_IPCONFIG" >> $LOCALHOST_VARS
+echo "vfw_untrust_nic: $VFW_UNTRUST_NIC" >> $LOCALHOST_VARS
 
 touch $VFW_HOST_VARS
 echo "---" > $VFW_HOST_VARS
@@ -170,68 +200,15 @@ VFW_INVENTORY="./ansible/hosts/inventory"
 touch $VFW_INVENTORY
 echo "$VFW_FQDN" > $VFW_INVENTORY
 cd ansible
-# Delete old subnet - check if exists first
-#echo "Deleting subnet 8"
-#$AZ network vnet subnet delete -n $vnet_name_sub8 -g $vnet_rg --vnet-name $vnet_name 
+$ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
 
-# Create new subnets - check if exists first
-#echo 'Recreating Subnets as /28s'
-#mgmt_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_MGMT_NAME --address-prefix "$VFW_MGMT_PREFIX")
-#untrust_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_UNTRUST_NAME --address-prefix "$VFW_UNTRUST_PREFIX")
-#trust_create=$($AZ network vnet subnet create -g $vnet_rg --vnet-name $vnet_name -n $VFW_TRUST_NAME --address-prefix "$VFW_TRUST_PREFIX")
-
-# Create Resource group
-#echo "Creating RG $VFW_RG"
-#az group create --location $location -n $VFW_RG
-# Create Storage account
-#echo "Creating Storage account $VFW_STORAGE"
-#storage_create=$($AZ storage account create -l $location -n $VFW_STORAGE -g $VFW_RG --sku $STORAGE_SKU)
-#Deploy VM using local AzureDeploy.json file.  Could also use a URI including new Azure template storage which is currently in Preview
-#echo "Starting deployment..."
-#$AZ group deployment create -g $VFW_RG --template-file AzureDeploy.json --parameters '{
-#	"vmName": {"value": "'$VFW_NAME'"},
-#	"storageAccountName": {"value": "'$VFW_STORAGE'"},
-#	"storageAccountExistingRG": {"value": "'$VFW_RG'"},
-#	"vmSize": {"value": "'$VFW_SIZE'"},
-#	"imageVersion": {"value": "'$PAN_VERSION'"},
-#	"imageSku": {"value": "'$PAN_SKU'"},
-#	"virtualNetworkName": {"value": "'$vnet_name'"},
-#	"virtualNetworkAddressPrefix": {"value": "'$vnet_prefix'"},
-#	"virtualNetworkExistingRGName": {"value": "'$vnet_rg'"},
-#	"subnet0Name": {"value": "'$VFW_MGMT_NAME'"},
-#	"subnet1Name": {"value": "'$VFW_UNTRUST_NAME'"},
-#	"subnet2Name": {"value": "'$VFW_TRUST_NAME'"},
-#	"subnet0Prefix": {"value": "'$VFW_MGMT_PREFIX'"},
-#	"subnet1Prefix": {"value": "'$VFW_UNTRUST_PREFIX'"},
-#	"subnet2Prefix": {"value": "'$VFW_TRUST_PREFIX'"},
-#	"subnet0StartAddress": {"value": "'$VFW_MGMT_START'"},
-#	"subnet1StartAddress": {"value": "'$VFW_UNTRUST_START'"},
-#	"subnet2StartAddress": {"value": "'$VFW_TRUST_START'"},
-#	"adminUsername": {"value": "'$vpan_admin'"},
-#	"adminPassword": {"value": "'$vpan_password'"},
-#	"publicIPAddressName": {"value": "'$VFW_MGMT_PUBLIC_IP_DNS'"}
-#	}'
-#echo "Deployment complete."
-# Some logic to quit program if VM not created
-# if az resource vm not exist then exit or store above command in variable
-# will depend on if adding the $() will cause json formatting issues
-# Post Deploy
-# Create Untrust Public IP object and associate with untrust network interface
-echo "Create public IPs and associate with Untrust"
-$AZ network public-ip create --resource-group $VFW_RG -n $VFW_UNTRUST_PUBLIC_IP_DNS --allocation-method static --dns-name $VFW_UNTRUST_PUBLIC_IP_DNS -l $location
+echo "associate Public IP with Untrust"
 $AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
 # Tag VM  - need to figure out what to use for values - from salesforce?
 #az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
-# Create inventory if not there and overwrite with current firewall
-
-# Run that playbook
-echo "waiting for firewall to finish booting"
-sleep 90
-echo "Configuring..."
-$ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
-
 # Post Config azure routing/acls
+# Not supported by Azure Ansible Yet
 #UDRs
 echo "Creating UDRs and associating with subnets"
 VFW_RT_NAME="$region-TEN$tenantID-RT1"

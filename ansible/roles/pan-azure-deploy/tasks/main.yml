@@ -22,7 +22,7 @@
 
 - name: Create Storage Account
   azure_rm_storageaccount:
-      resoure_group: "{{ vfw_rg }}"
+      resource_group: "{{ vfw_rg }}"
       name: "{{ vfw_sa }}"
       type: "{{ storage_sku }}"
 
@@ -30,7 +30,8 @@
   azure_rm_deployment:
       state: present
       resource_group_name: "{{ vfw_rg }}"
-      template_link: "./AzureDeploy.json"
+      location: "{{ location }}"
+      template_link: 'https://raw.githubusercontent.com/pmusolino-rms/rms-pan-azure-hplus-tenant/master/AzureDeploy.json'
       parameters:
           vmName:
               value: "{{ vpan_name }}"
@@ -74,3 +75,22 @@
               value: "{{ vpan_password }}"
           publicIPAddressName:
               value: "{{ vpan_name }}"
+  tags: deploy
+
+- name: Create Public IP address
+  azure_rm_publicipaddress:
+      resource_group: "{{ vfw_rg }}"
+      name: "{{ vfw_untrust_ip_dns }}"
+      allocation_method: Static
+      location: "{{ location }}"
+      domain_name: "{{ vfw_untrust_ip_dns }}"
+  tags: pubip
+## Unable to do the below: https://github.com/ansible/ansible/issues/29607
+#- name: Associate IP with Nic
+#  azure_rm_networkinterface:
+#      name: "{{ vfw_untrust_nic }}"
+#      resource_group: "{{ vfw_rg }}"
+#      virtual_network_name: "{{ tenant_vnet }}"
+#      public_ip_address_name: "{{ vfw_untrust_ip_dns }}"
+#      subnet_name: "{{ tenant_vfw_untrust }}"
+#  tags: pubip
