@@ -1,0 +1,43 @@
+---
+# tasks file for pan-azure-security
+- name: Create Security rules
+  azure_rm_securitygroup:
+      resource_group: "{{ vfw_rg }}"
+      name: "{{ vfw_nsg }}"
+      purge_rules: yes
+      rules:
+          - name: "Allow Newark"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ newark }}"
+          - name: "Allow Newark"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ hoboken }}"
+          - name: "Allow Newark"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ london }}"
+          - name: "Allow Newark"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ noida }}"
+          - name: "Allow Newark"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ eun-net-mgmt }}"

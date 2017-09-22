@@ -1,6 +1,6 @@
 ---
-vpan_admin: fwadmin
-vpan_password: "ITfir3W@ll5!"
+vpan_admin: username
+vpan_password: "passwordforyou"
 vfw_size: "Standard_D3_v2"
 vfw_version: "latest"
 storage_sku: "Standard_LRS"

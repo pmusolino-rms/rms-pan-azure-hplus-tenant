@@ -73,7 +73,7 @@ VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
-
+VFW_NSG="$region-TEN$tenantID-NSG"
 # Make sure logged out already
 echo "Forcing logout of an existing session"
 az logout
@@ -195,6 +195,8 @@ echo "vfw_tenant_nexthop: $VFW_TRUST_NEXTHOP" >> $VFW_HOST_VARS
 echo "vfw_default_nexthop: $VFW_UNTRUST_NEXTHOP" >> $VFW_HOST_VARS
 echo "vfw_untrust_ip: $VFW_UNTRUST_START" >> $VFW_HOST_VARS
 echo "vfw_trust_ip: $VFW_TRUST_START" >> $VFW_HOST_VARS
+echo "vfw_rg: $VFW_RG" >> $VFW_HOST_VARS
+echo "vfw_nsg: $VFW_NSG" >> $VFW_HOST_VARS
 
 VFW_INVENTORY="./ansible/hosts/inventory"
 touch $VFW_INVENTORY
