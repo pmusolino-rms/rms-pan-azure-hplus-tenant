@@ -73,7 +73,7 @@ VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
-VFW_NSG="$region-TEN$tenantID-NSG"
+VFW_NSG="$region-TEN$tenantID-VFW-NSG"
 # Make sure logged out already
 echo "Forcing logout of an existing session"
 az logout
