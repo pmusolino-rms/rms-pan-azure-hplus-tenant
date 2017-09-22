@@ -13,28 +13,28 @@
             priority: 100
             direction: Inbound
             source_address_prefix: "{{ subnet1 }}"
-          - name: "Allow Newark"
+          - name: "Allow Location"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
             source_address_prefix: "{{ subnet2 }}"
-          - name: "Allow Newark"
+          - name: "Allow Location"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
             source_address_prefix: "{{ subnet3 }}"
-          - name: "Allow Newark"
+          - name: "Allow Location"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
             source_address_prefix: "{{ subnet4 }}"
-          - name: "Allow Newark"
+          - name: "Allow Location"
             protocol: TCP
             destination_port: 22,443
             access: Allow
