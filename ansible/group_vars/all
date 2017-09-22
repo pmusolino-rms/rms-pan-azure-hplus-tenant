@@ -1,4 +1,7 @@
 ---
-vpan_admin: user
-vpan_password: "somepassword"
-api_key: "SOMEAPIKEYTHATISREALLYLONGBUTOPTIONAL="
+vpan_admin: fwadmin
+vpan_password: "ITfir3W@ll5!"
+vfw_size: "Standard_D3_v2"
+vfw_version: "latest"
+storage_sku: "Standard_LRS"
+vfw_sku: "byol"
