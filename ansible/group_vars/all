@@ -5,3 +5,8 @@ vfw_size: "Standard_D3_v2"
 vfw_version: "latest"
 storage_sku: "Standard_LRS"
 vfw_sku: "byol"
+subnet1: "5.6.7.0/24"
+subnet2: "4.5.6.0/24"
+subnet3: "3.4.5.0/24"
+subnet4: "2.3.4.0/24"
+ansible-host: "1.2.3.4
