@@ -3,10 +3,10 @@
 - name: Generate basic Config files
   template: src=pan.j2 dest=/tmp/{{vfw_name}}.txt
 
-- name: Wait 90 seconds to allow FW boot
-  wait_for: timeout=90
+- name: Wait 5 minutes to allow FW boot
+  wait_for: timeout=300
   delegate_to: localhost
-  
+
 - name: Install config from template
   napalm_install_config:
       provider: "{{ provider }}"
