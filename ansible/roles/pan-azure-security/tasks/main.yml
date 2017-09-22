@@ -6,38 +6,38 @@
       name: "{{ vfw_nsg }}"
       purge_rules: yes
       rules:
+          - name: "Allow Location"
+            protocol: TCP
+            destination_port: 22,443
+            access: Allow
+            priority: 100
+            direction: Inbound
+            source_address_prefix: "{{ subnet1 }}"
           - name: "Allow Newark"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
-            source_address_prefix: "{{ newark }}"
+            source_address_prefix: "{{ subnet2 }}"
           - name: "Allow Newark"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
-            source_address_prefix: "{{ hoboken }}"
+            source_address_prefix: "{{ subnet3 }}"
           - name: "Allow Newark"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
-            source_address_prefix: "{{ london }}"
+            source_address_prefix: "{{ subnet4 }}"
           - name: "Allow Newark"
             protocol: TCP
             destination_port: 22,443
             access: Allow
             priority: 100
             direction: Inbound
-            source_address_prefix: "{{ noida }}"
-          - name: "Allow Newark"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ eun-net-mgmt }}"
+            source_address_prefix: "{{ ansible-host }}"
