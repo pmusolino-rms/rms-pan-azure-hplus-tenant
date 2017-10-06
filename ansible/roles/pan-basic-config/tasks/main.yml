@@ -1,7 +1,7 @@
 ---
 # tasks file for pan_basic_config
 - name: Generate basic Config files
-  template: src=pan.j2 dest=/tmp/{{vfw_name}}.txt
+  template: src=pan.j2 dest=/tmp/{{vpan_name}}.txt
 
 - name: Wait 5 minutes to allow FW boot
   wait_for: timeout=300
@@ -10,7 +10,7 @@
 - name: Install config from template
   napalm_install_config:
       provider: "{{ provider }}"
-      config_file: /tmp/{{ vfw_name }}.txt
+      config_file: /tmp/{{ vpan_name }}.txt
       get_diffs: False
       commit_changes: True
 

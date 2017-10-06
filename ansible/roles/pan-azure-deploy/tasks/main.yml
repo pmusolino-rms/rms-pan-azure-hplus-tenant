@@ -2,6 +2,10 @@
 # tasks file for pan-azure-deploy
 - name: Remove Subnet8
   azure_rm_subnet:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       name: "{{ tenant_subnet8 }}"
       virtual_network_name: "{{ tenant_vnet }}"
       resource_group: "{{ tenant_rg }}"
@@ -9,6 +13,10 @@
 
 - name: Create subnets 
   azure_rm_subnet:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       name: "{{ item.name }}"
       virtual_network_name: "{{ tenant_vnet }}"
       resource_group: "{{ tenant_rg }}"
@@ -17,17 +25,29 @@
 
 - name: Create Resource Group
   azure_rm_resourcegroup:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       name: "{{ vfw_rg }}"
       location: "{{ location }}"
 
 - name: Create Storage Account
   azure_rm_storageaccount:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       resource_group: "{{ vfw_rg }}"
       name: "{{ vfw_sa }}"
       type: "{{ storage_sku }}"
 
 - name: Deploy Firewall from Template
   azure_rm_deployment:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       state: present
       resource_group_name: "{{ vfw_rg }}"
       location: "{{ location }}"
@@ -79,6 +99,10 @@
 
 - name: Create Public IP address
   azure_rm_publicipaddress:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
       resource_group: "{{ vfw_rg }}"
       name: "{{ vfw_untrust_ip_dns }}"
       allocation_method: Static
