@@ -73,7 +73,7 @@ VFW_TRUST_NAME="$region-TEN$tenantID-Sub8-Trust"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_UNTRUST_NIC="$VFW_NAME-eth1"
 VFW_UNTRUST_IPCONFIG="ipconfig-untrust"
-VFW_NSG="$region-TEN$tenantID-VFW-NSG"
+VFW_NSG="$region-TEN$tenantID-NSG"
 # Make sure logged out already
 echo "Forcing logout of an existing session"
 az logout
@@ -94,6 +94,11 @@ if [ -z "${vnet_string}" ]; then
 	$AZ logout
 	exit 1
 fi
+if [ -z "${account}" ]; then
+    account=$(echo $vnet_string | cut -d: -f2 | cut -d/ -f3)
+	$AZ account set --subscription $account
+fi
+subscription_name=$($AZ account show -s $account -o tsv | cut -f 4)
 vnet_array=()
 while read -r line; do
 	vnet_array+=("$line")
@@ -119,11 +124,10 @@ vnet_sub8_range=$($AZ network vnet subnet show -n $vnet_name_sub8 --resource-gro
 vnet_sub8_net=$(sed 's/.\{2\}$//' <<< "$vnet_sub8_range")
 if [ -z "${vnet_sub8_net}" ]; then
     vnet_sub8_net=${classb}.${sub8_octet}
-	echo hi
 fi
 vnet_prefix=$($AZ network vnet show -n $vnet_name -g $vnet_rg --query [addressSpace.addressPrefixes] | grep '/')
 vnet_prefix=$(echo $vnet_prefix | sed -e 's/^"//' -e 's/"$//')
-$DIALOG --title "Confirm" --backtitle "Azure VPAN Creation" --yesno "Region: ${region}, Tenant: ${tenantID}, RG: ${vnet_rg},\nVnet: ${vnet_name}, IP Space ${vnet_tenant_supernet}" 7 60
+$DIALOG --title "Confirm" --backtitle "Azure VPAN Creation" --yesno "Region: ${region}, Tenant: ${tenantID}, RG: ${vnet_rg},\nVnet: ${vnet_name}, IP Space ${vnet_tenant_supernet}, Subscription: ${subscription_name}" 7 60
 response=$?
 case $response in
     0) 
@@ -183,6 +187,10 @@ echo "vpan_name: $VFW_NAME" >> $LOCALHOST_VARS
 echo "vfw_untrust_ip_dns: $VFW_UNTRUST_PUBLIC_IP_DNS"  >> $LOCALHOST_VARS
 echo "vfw_untrust_ipconfig: $VFW_UNTRUST_IPCONFIG" >> $LOCALHOST_VARS
 echo "vfw_untrust_nic: $VFW_UNTRUST_NIC" >> $LOCALHOST_VARS
+echo "client_id: $username" >> $LOCALHOST_VARS
+echo "tenant: $tenant" >> $LOCALHOST_VARS
+echo "secret: $password" >> $LOCALHOST_VARS
+echo "subscription_id: $account" >> $LOCALHOST_VARS
 
 touch $VFW_HOST_VARS
 echo "---" > $VFW_HOST_VARS
@@ -201,9 +209,10 @@ echo "vfw_nsg: $VFW_NSG" >> $VFW_HOST_VARS
 VFW_INVENTORY="./ansible/hosts/inventory"
 touch $VFW_INVENTORY
 echo "$VFW_FQDN" > $VFW_INVENTORY
+#if ansible dir exists
 cd ansible
-$ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
 
+$ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
 echo "associate Public IP with Untrust"
 $AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
 # Tag VM  - need to figure out what to use for values - from salesforce?
@@ -214,11 +223,13 @@ $AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_
 #UDRs
 echo "Creating UDRs and associating with subnets"
 VFW_RT_NAME="$region-TEN$tenantID-RT1"
-$AZ network route-table create -n $VFW_RT_NAME -g $vnet_rg -l $location
-$AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $vnet_rg --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
+$AZ network route-table create -n $VFW_RT_NAME -g $VFW_RG -l $location
+$AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $VFW_RG --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
+#grab route table ID
+route_id=$(az network route-table show -n $VFW_RT_NAME -g $VFW_RG -o tsv | cut -f2)
 for i in `seq 1 7`
     do
-	$AZ network vnet subnet update --route-table $VFW_RT_NAME -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
+	$AZ network vnet subnet update --route-table $route_id -g $VFW_RG --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
 	done
 
 #log out of azure

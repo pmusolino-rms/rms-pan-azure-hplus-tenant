@@ -1,43 +1,20 @@
 ---
 # tasks file for pan-azure-security
-- name: Create Security rules
-  azure_rm_securitygroup:
-      resource_group: "{{ vfw_rg }}"
-      name: "{{ vfw_nsg }}"
-      purge_rules: yes
-      rules:
-          - name: "Allow Location"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ subnet1 }}"
-          - name: "Allow Location"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ subnet2 }}"
-          - name: "Allow Location"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ subnet3 }}"
-          - name: "Allow Location"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ subnet4 }}"
-          - name: "Allow Location"
-            protocol: TCP
-            destination_port: 22,443
-            access: Allow
-            priority: 100
-            direction: Inbound
-            source_address_prefix: "{{ ansible-host }}"
+- name: Generate Management Profile rules
+  template: src=pan_sec.j2 dest=/tmp/{{vpan_name}}_sec.txt
+
+- name: Install MGMT Security profile from template
+  napalm_install_config:
+      provider: "{{ provider }}"
+      config_file: /tmp/{{ vpan_name }}_sec.txt
+      get_diffs: False
+      commit_changes: True
+
+- name: Generic management settings
+  panos_mgtconfig:
+      ip_address: '{{ vfw_fqdn }}'
+      username: '{{ vpan_admin }}'
+      password: '{{ vpan_password }}'
+      timezone: '{{ tz  }}'
+      login_banner: '{{ banner }}'
+      commit: true
