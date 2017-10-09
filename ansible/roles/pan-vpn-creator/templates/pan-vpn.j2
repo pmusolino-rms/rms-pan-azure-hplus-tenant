@@ -1,0 +1,3 @@
+{% for item in routes %}
+    set network virtual-router {{vfw_vr}} routing-table ip static-route REMOTE-ID{{loop.index}} interface tunnel.1 destination {{item}} nexthop None
+{% endfor %}

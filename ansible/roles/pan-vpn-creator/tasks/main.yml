@@ -1,0 +1,43 @@
+---
+- name: Generate vpn config
+  template: src=pan-vpn.j2 dest={{ vpan_name }}-vpn.txt
+  with_lines: routes.txt
+
+- name: Install config from template
+  napalm_install_config:
+      provider: "{{ provider }}"
+      config_file: files/{{ vpan_name }}-vpn.txt
+      get_diffs: False
+      commit_changes: True
+
+- name: Update Inbound Security rules
+  azure_rm_securitygroup:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
+      resource_group: "{{ vfw_rg }}"
+      name: "{{ vfw_nsg }}"
+      rules:
+          - name: "Allow-Tenant-In{{ item.0 }}"
+            direction: Inbound
+            source_address_prefix: "{{ item.1 }}"
+            destination_address_prefix: "{{ vfw_tenant_supernet }}"
+            priority: "{{ item.0 + 110 }}"
+  with_indexed_items: "routes.txt"
+
+- name: Update Outbound Security rules
+  azure_rm_securitygroup:
+      client_id: "{{ client_id }}"
+      tenant: "{{ tenant }}"
+      subscription_id: "{{ subscription_id }}"
+      secret: "{{ secret }}"
+      resource_group: "{{ vfw_rg }}"
+      name: "{{ vfw_nsg }}"
+      rules:
+          - name: "Allow-Tenant-Out{{ item.0 }}"
+            direction: Outbound
+            source_address_prefix: "{{ vfw_tenant_supernet }}"
+            destination_address_prefix: "{{ item.1 }}"
+            priority: "{{ item.0 + 110 }}"
+  with_indexed_items: "routes.txt"

@@ -1,0 +1,12 @@
+---
+-   hosts: localhost
+    connection: local
+    gather_facts: false
+    vars:
+        provider:
+            hostname: "{{ vfw_fqdn }}"
+            username: "{{ vpan_admin }}"
+            password: "{{ vpan_password }}"
+            dev_os: "panos" 
+    roles:
+        - role: pan-vpn-creator
