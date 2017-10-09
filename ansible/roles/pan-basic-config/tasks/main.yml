@@ -14,18 +14,17 @@
       get_diffs: False
       commit_changes: True
 
-- name: Create Trust rule
+- name: Create Untrust VPN rule
   panos_security_rule:
       ip_address: '{{ vfw_fqdn }}'
       username: '{{ vpan_admin }}'
       password: '{{ vpan_password }}'
       operation: 'add'
-      rule_name: 'Trust to Trust'
-      description: 'Allow intra Trust zone'
-      source_zone: ['Trust']
-      destination_zone: ['Trust']
-      application: ['any']
-      service: ['any']
+      rule_name: 'Allow VPN'
+      description: ' VPN over Untrust zone'
+      source_zone: ['Untrust']
+      destination_zone: ['Untrust']
+      application: ['icmp', 'ike', 'ipsec', 'ping', 'traceroute']
       action: 'allow'
       commit: False
   ignore_errors: true
@@ -36,10 +35,26 @@
       username: '{{ vpan_admin }}'
       password: '{{ vpan_password }}'
       operation: 'add'
-      rule_name: 'Untrust to Untrust'
-      description: 'Allow intra Untrust zone'
+      rule_name: 'Untrust Drop'
+      description: 'Deny intra Untrust zone'
       source_zone: ['Untrust']
       destination_zone: ['Untrust']
+      application: ['any']
+      service: ['any']
+      action: 'deny'
+      commit: False
+  ignore_errors: true
+
+- name: Create Trust rule
+  panos_security_rule:
+      ip_address: '{{ vfw_fqdn }}'
+      username: '{{ vpan_admin }}'
+      password: '{{ vpan_password }}'
+      operation: 'add'
+      rule_name: 'Trust to Trust'
+      description: 'Allow intra Trust zone'
+      source_zone: ['Trust']
+      destination_zone: ['Trust']
       application: ['any']
       service: ['any']
       action: 'allow'
