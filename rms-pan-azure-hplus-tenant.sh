@@ -231,7 +231,7 @@ $AZ network route-table route create --address-prefix $shared_services -n "Share
 route_id=$(az network route-table show -n $VFW_RT_NAME -g $VFW_RG -o tsv | cut -f2)
 for i in `seq 1 7`
     do
-	$AZ network vnet subnet update --route-table $route_id -g $VFW_RG --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
+	$AZ network vnet subnet update --route-table $route_id -g $vnet_rg --vnet-name $vnet_name -n ${vnet_name_sub_pre}${i}
 	done
 
 #log out of azure
