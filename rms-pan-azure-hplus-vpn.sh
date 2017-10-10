@@ -151,6 +151,7 @@ LOCALHOST_VARS="./ansible/host_vars/localhost"
 touch $LOCALHOST_VARS
 echo "---" > $LOCALHOST_VARS
 echo "vfw_rg: $VFW_RG" >> $LOCALHOST_VARS
+echo "vnet_rg: $vnet_rg" >> $LOCALHOST_VARS
 echo "vfw_nsg: $VFW_NSG" >> $LOCALHOST_VARS
 echo "vfw_fqdn: $VFW_FQDN" >> $LOCALHOST_VARS
 echo "vfw_vr: $VFW_VR" >> $LOCALHOST_VARS
