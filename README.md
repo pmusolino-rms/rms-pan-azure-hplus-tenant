@@ -1,4 +1,5 @@
 # rms-pan-azure-hplus-tenant
+version 2.0
 
 Requirements:
 Linux/MacOS
