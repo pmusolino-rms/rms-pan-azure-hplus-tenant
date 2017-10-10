@@ -1,5 +1,5 @@
 #!/bin/bash
-ROLES_FILES=ansible/roles/pan-vpn-creator/vars
+VARS_FILES=ansible/roles/pan-vpn-creator/vars
 LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
 ANSIBLE_PLAYBOOK=`which ansible-playbook`
