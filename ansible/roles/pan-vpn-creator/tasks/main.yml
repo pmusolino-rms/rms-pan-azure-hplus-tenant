@@ -1,6 +1,6 @@
 ---
 - name: Generate vpn config
-  template: src=pan-vpn.j2 dest={{ vpan_name }}-vpn.txt
+  template: src=pan-vpn.j2 dest=files/{{ vpan_name }}-vpn.txt
   with_items: routes
 
 - name: Install config from template
