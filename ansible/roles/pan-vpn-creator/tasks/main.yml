@@ -1,7 +1,7 @@
 ---
 - name: Generate vpn config
   template: src=pan-vpn.j2 dest={{ vpan_name }}-vpn.txt
-  with_lines: routes.txt
+  with_items: routes
 
 - name: Install config from template
   napalm_install_config:
@@ -24,7 +24,7 @@
             source_address_prefix: "{{ item.1 }}"
             destination_address_prefix: "{{ vfw_tenant_supernet }}"
             priority: "{{ item.0 + 110 }}"
-  with_indexed_items: "routes.txt"
+  with_indexed_items: routes
 
 - name: Update Outbound Security rules
   azure_rm_securitygroup:
@@ -40,4 +40,4 @@
             source_address_prefix: "{{ vfw_tenant_supernet }}"
             destination_address_prefix: "{{ item.1 }}"
             priority: "{{ item.0 + 110 }}"
-  with_indexed_items: "routes.txt"
+  with_indexed_items: routes

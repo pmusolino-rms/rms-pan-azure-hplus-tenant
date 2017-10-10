@@ -1,5 +1,5 @@
 #!/bin/bash
-ROLES_FILES=ansible/roles/pan-vpn-creator/files
+ROLES_FILES=ansible/roles/pan-vpn-creator/vars
 LOGIN_VARIABLES="./vpan-vars"
 DIALOG=`which dialog`
 ANSIBLE_PLAYBOOK=`which ansible-playbook`
@@ -17,9 +17,10 @@ function get_routes {
         fi; 
     done
 
-    cat /dev/null > $ROLES_FILES/routes.txt
+    echo "---" > $VARS_FILES/main.yml
+    echo "routes:" >> $VARS_FILES/main.yml
     for i in ${list[@]}; do
-        echo $i >> $ROLES_FILES/routes.txt
+        echo "- $i" >> $VARS_FILES/main.yml
     done
 }
 
@@ -72,30 +73,18 @@ VFW_NAME="${region_lower}ten${tenantID}vfw"
 VFW_FQDN="$VFW_NAME.$location.cloudapp.azure.com"
 VFW_NSG="$region-TEN$tenantID-NSG"
 VFW_VR="$region-Ten$tenantID-VR"
-LOCALHOST_VARS="./ansible/host_vars/localhost"
-touch $LOCALHOST_VARS
-echo "---" > $LOCALHOST_VARS
-echo "vfw_rg: $VFW_RG" >> $LOCALHOST_VARS
-echo "vfw_nsg: $VFW_NSG" >> $LOCALHOST_VARS
-echo "vfw_fqdn: $VFW_FQDN" >> $LOCALHOST_VARS
-echo "vfw_vr: $VFW_VR" >> $LOCALHOST_VARS
-echo "vpan_name: $VFW_NAME" >> $LOCALHOST_VARS
-echo "client_id: $username" >> $LOCALHOST_VARS
-echo "tenant: $tenant" >> $LOCALHOST_VARS
-echo "secret: $password" >> $LOCALHOST_VARS
-echo "subscription_id: $account" >> $LOCALHOST_VARS
-echo "vfw_tenant_supernet: $vnet_tenant_supernet" >> $LOCALHOST_VARS
+
 
 
 get_route=true
 if [ $# -eq 1 ]; then
     get_route=false
-    cp $1 $ROLES_FILES/routes.txt
+    cp $1 $VARS_FILES/main.yml
 fi
 
 while $get_route; do
     get_routes
-    dialog --title "Is this correct" --yesno "$(cat $ROLES_FILES/routes.txt)" 20 60;
+    dialog --title "Is this correct" --yesno "$(cat $VARS_FILES/main.yml)" 20 60;
     response=$?
     case $response in
         0)
@@ -158,6 +147,7 @@ vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "$vnet_name_sub1")
 vnet_sub1_range=$($AZ network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_tenant_supernet="$vnet_sub1_range/21"
 
+LOCALHOST_VARS="./ansible/host_vars/localhost"
 touch $LOCALHOST_VARS
 echo "---" > $LOCALHOST_VARS
 echo "vfw_rg: $VFW_RG" >> $LOCALHOST_VARS
