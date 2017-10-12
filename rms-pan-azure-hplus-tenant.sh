@@ -110,11 +110,18 @@ IFS=/
 read -a vnet_vars <<< "${vnet_array[0]}"
 vnet_rg=${vnet_vars[4]}
 vnet_name=${vnet_vars[8]}
-vnet_name_sub1=$(echo ${vnet_vars[10]} | cut -d\" -f1)
+vnet_name_sub=$(echo ${vnet_vars[10]} | cut -d\" -f1 | cut -d'-' -f1-3)
+declare -a vnet_subnets
+vnet_subnets+=("$vnet_name_sub")
 read -a vnet_vars <<< "${vnet_array[1]}"
-vnet_name_sub8=$(echo ${vnet_vars[10]} | cut -d\" -f1 | cut -d'-' -f1-3)
+vnet_name_sub=$(echo ${vnet_vars[10]} | cut -d\" -f1 | cut -d'-' -f1-3)
+vnet_subnets+=("$vnet_name_sub")
+IFS=$'\n' sorted_subnets=($(sort <<< "${vnet_subnets[*]}"))
 unset IFS
-vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "$vnet_name_sub1")
+vnet_name_sub1=${sorted_subnets[0]}
+vnet_name_sub8=${sorted_subnets[1]}
+
+vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "${vnet_name_sub1")
 #Get Subnet1 info to determine /21 starting range
 vnet_sub1_range=$($AZ network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_tenant_supernet="$vnet_sub1_range/21"
