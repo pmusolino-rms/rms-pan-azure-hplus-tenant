@@ -122,7 +122,7 @@ unset IFS
 vnet_name_sub1=${sorted_subnets[0]}
 vnet_name_sub8=${sorted_subnets[1]}
 
-vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "${vnet_name_sub1"})
+vnet_name_sub_pre=$(sed 's/.\{1\}$//' <<< "${vnet_name_sub1}")
 #Get Subnet1 info to determine /21 starting range
 vnet_sub1_range=$($AZ network vnet subnet show -n $vnet_name_sub1 --resource-group $vnet_rg --vnet-name $vnet_name | grep Prefix |cut -f4 -d\" | cut -f 1 -d/)
 vnet_tenant_supernet="$vnet_sub1_range/21"
