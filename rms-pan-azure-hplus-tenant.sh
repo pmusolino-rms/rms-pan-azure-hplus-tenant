@@ -88,7 +88,8 @@ fi
 if [ -n "${account}" ]; then
 	$AZ account set --subscription $account
 fi
-#Get vnet variables for tenant ID provided and place into an array.  
+#Get vnet variables for tenant ID provided and place into an array.
+echo "Determining network information"
 vnet_string=$($AZ network vnet list | grep $tenantID | grep $region | grep id | grep -e Sub[1,8])
 if [ -z "${vnet_string}" ]; then 
 	echo "Could not find a network in $region with tenant id $tenantID.  Exiting..."
@@ -223,7 +224,7 @@ cd ansible
 
 $ANSIBLE_PLAYBOOK basic_network_config.yml -e "vfw_fqdn=$VFW_FQDN"
 echo "associate Public IP with Untrust"
-$AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
+nic=$AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_UNTRUST_IPCONFIG --public-ip-address $VFW_UNTRUST_PUBLIC_IP_DNS
 # Tag VM  - need to figure out what to use for values - from salesforce?
 #az resource tag --tags CustomerID=1570 CustomerName="Cloud Operations" Description="Test FW Deploy" EnvironmentType=Internal-Dev Product-Line="Non-RMS(one)" ProductSKU=MGMT ProjectCode="N/A" RequestID="N/A" -g $VFW_RG -n $VFW_NAME --resource-type "Microsoft.Compute/virtualMachines"
 
@@ -232,8 +233,8 @@ $AZ network nic ip-config update -g $VFW_RG --nic-name $VFW_UNTRUST_NIC -n $VFW_
 #UDRs
 echo "Creating UDRs and associating with subnets"
 VFW_RT_NAME="$region-TEN$tenantID-RT1"
-$AZ network route-table create -n $VFW_RT_NAME -g $VFW_RG -l $location
-$AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $VFW_RG --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
+rt_create=$AZ network route-table create -n $VFW_RT_NAME -g $VFW_RG -l $location
+rt_add=$AZ network route-table route create --address-prefix $shared_services -n "Shared Services" --next-hop-type "VirtualAppliance" -g $VFW_RG --route-table-name $VFW_RT_NAME --next-hop-ip-address $shared_services_fw
 #grab route table ID
 route_id=$(az network route-table show -n $VFW_RT_NAME -g $VFW_RG -o tsv | cut -f2)
 for i in `seq 1 7`
